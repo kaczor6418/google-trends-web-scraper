@@ -1,35 +1,44 @@
-require('dotenv').config();
-const { chromium } = require('playwright');
-const fs = require('fs');
-const path = require('path');
-const csv = require('csvtojson');
+import dotenv from 'dotenv';
+import { chromium } from 'playwright';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import csv from 'csvtojson';
 
-// --- CONFIGURATION FROM ENV ---
+dotenv.config();
+
+// --- ESM PATH HELPERS ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// --- CONFIGURATION ---
 const CHROME_DEBUG_URL = process.env.CHROME_DEBUG_URL || 'http://localhost:9222';
 const DOWNLOAD_TEMP_DIR = process.env.DOWNLOAD_TEMP_DIR || path.join(__dirname, 'temp_downloads');
+const FALLBACK_DIR = path.join(__dirname, 'fallbacks');
 const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://localhost:3001/api/trends/snapshot';
+
+// Ensure directories exist
+[DOWNLOAD_TEMP_DIR, FALLBACK_DIR].forEach(dir => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+});
 
 // --- HELPERS ---
 
-/**
- * Generates a filename pattern: [phrase-geo-timeframe][YYYY-MM-DD_HH-mm-ss].json
- */
+const humanDelay = (min = process.env.MIN_DELAY || 2000, max = process.env.MAX_DELAY || 5000) =>
+  new Promise(res => setTimeout(res, Math.floor(Math.random() * (Number(max) - Number(min) + 1) + Number(min))));
+
 function generateFallbackFilename(result) {
   const timestamp = new Date().toISOString()
     .replace(/[:.]/g, '-')
     .replace('T', '_')
     .split('Z')[0];
   
-  // Sanitize the phrase for filesystem safety
   const sanitizedPhrase = result.phrase.replace(/[^a-z0-9]/gi, '_').toLowerCase();
   const sanitizedTF = result.timeframe.replace(/[^a-z0-9]/gi, '_').toLowerCase();
   
   return `fallback-[${sanitizedPhrase}-${result.geo}-${sanitizedTF}][${timestamp}].json`;
 }
 
-/**
- * Human-friendly labels -> Google Trends `date=` param
- */
 const TIMEFRAME_MAP = new Map([
   ["past 24 hours", "now 1-d"],
   ["past day", "now 1-d"],
@@ -53,10 +62,6 @@ const WIDGET_NAME_BY_INDEX = {
   2: "Rising queries",
 };
 
-function getWidgetName(i) {
-  return WIDGET_NAME_BY_INDEX[i] ?? `Widget ${i}`;
-}
-
 function normalizeTimeframe(timeframeInput) {
   if (timeframeInput == null) return { label: "past year", param: "today 12-m" };
   const raw = String(timeframeInput).trim();
@@ -65,9 +70,6 @@ function normalizeTimeframe(timeframeInput) {
   const knownLabel = TIMEFRAME_REVERSE_MAP.get(raw);
   return { label: knownLabel ? knownLabel : raw, param: raw };
 }
-
-const humanDelay = (min = process.env.MIN_DELAY || 2000, max = process.env.MAX_DELAY || 5000) =>
-  new Promise(res => setTimeout(res, Math.floor(Math.random() * (Number(max) - Number(min) + 1) + Number(min))));
 
 async function humanLikeScroll(page, selector = ".Jh24Ne") {
   await page.evaluate(async (sel) => {
@@ -104,7 +106,22 @@ async function humanClick(page, locator) {
 }
 
 /**
- * Template-style function for API communication with local fallback logic
+ * Persists data to the fallback directory
+ */
+function saveToFallbackFile(result) {
+  const filename = generateFallbackFilename(result);
+  const filePath = path.join(FALLBACK_DIR, filename);
+  
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(result, null, 2));
+    console.log(`[FALLBACK STORED] ${filename}`);
+  } catch (err) {
+    console.error(`[CRITICAL] Could not write fallback: ${err.message}`);
+  }
+}
+
+/**
+ * Template for server communication
  */
 async function sendResultToServer(newResult) {
   try {
@@ -114,39 +131,22 @@ async function sendResultToServer(newResult) {
       body: JSON.stringify(newResult)
     });
 
-    if (!response.ok) {
-      throw new Error(`Server returned ${response.status}`);
-    }
-    console.log(`[SUCCESS] Data sent to server for: ${newResult.phrase}`);
+    if (!response.ok) throw new Error(`Status ${response.status}`);
+    console.log(`[SERVER OK] Data synced for: ${newResult.phrase}`);
   } catch (err) {
-    console.error(`[SERVER ERROR] ${err.message}. Saving to local fallback file...`);
+    console.error(`[SERVER FAIL] ${err.message}. Redirecting to fallbacks.`);
     saveToFallbackFile(newResult);
   }
 }
 
 /**
- * Saves data into a uniquely named file based on search parameters and time
- */
-function saveToFallbackFile(result) {
-  const filename = generateFallbackFilename(result);
-  const filePath = path.join(__dirname, filename);
-  
-  try {
-    fs.writeFileSync(filePath, JSON.stringify(result, null, 2));
-    console.log(`[FALLBACK CREATED] File: ${filename}`);
-  } catch (err) {
-    console.error(`[CRITICAL] Could not write fallback file: ${err.message}`);
-  }
-}
-
-/**
- * Core Scraping Logic
+ * Main Scraping Logic
  */
 async function scrapeTrendsWidget(page, entry, timeframeInput, geo) {
   const tf = normalizeTimeframe(timeframeInput);
   const url = `https://trends.google.com/explore?q=${encodeURIComponent(entry.phrase)}&date=${encodeURIComponent(tf.param)}&geo=${geo}`;
 
-  console.log(`\n--- Navigating to: ${entry.phrase} [${geo}] ---`);
+  console.log(`\n--- Processing: ${entry.phrase} [${geo}] ---`);
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await humanDelay(5000, 8000);
 
@@ -156,15 +156,13 @@ async function scrapeTrendsWidget(page, entry, timeframeInput, geo) {
     await humanLikeScroll(page);
     await page.waitForSelector(downloadButtonSelector, { state: 'visible', timeout: 35000 });
   } catch (e) {
-    console.warn(`[TIMEOUT] Buttons not found for ${entry.phrase}.`);
-    await page.screenshot({ path: `error_${entry.phrase}_${geo}.png` });
+    console.warn(`[SKIP] Elements not visible for ${entry.phrase}.`);
+    await page.screenshot({ path: path.join(__dirname, `error_${entry.phrase}.png`) });
     return;
   }
 
   const buttons = page.locator(downloadButtonSelector);
   const count = await buttons.count();
-
-  if (!fs.existsSync(DOWNLOAD_TEMP_DIR)) fs.mkdirSync(DOWNLOAD_TEMP_DIR);
 
   for (let i = 0; i < count; i++) {
     try {
@@ -181,7 +179,7 @@ async function scrapeTrendsWidget(page, entry, timeframeInput, geo) {
       await download.saveAs(filePath);
 
       const jsonData = await csv().fromFile(filePath);
-      const widgetName = getWidgetName(i);
+      const widgetName = WIDGET_NAME_BY_INDEX[i] ?? `Widget ${i}`;
 
       await sendResultToServer({
         phrase: entry.phrase,
@@ -196,39 +194,37 @@ async function scrapeTrendsWidget(page, entry, timeframeInput, geo) {
       await humanDelay(4000, 8000);
 
     } catch (err) {
-      console.error(`   [ERROR] Widget ${i} failed: ${err.message}`);
-      await humanDelay(15000, 30000);
+      console.error(`   [WIDGET ERROR] Index ${i}: ${err.message}`);
+      await humanDelay(10000, 20000);
     }
   }
 }
 
 async function startScraping(searchMovie) {
   try {
-    console.log(`Connecting to Chrome on ${CHROME_DEBUG_URL}...`);
+    console.log(`Connecting to CDP: ${CHROME_DEBUG_URL}`);
     const browser = await chromium.connectOverCDP(CHROME_DEBUG_URL);
     const context = browser.contexts()[0];
     const page = await context.newPage();
-
-    await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
 
     for (const item of searchMovie) {
       for (const time of item.timeframes) {
         for (const geo of item.geos) {
           await scrapeTrendsWidget(page, item, time, geo);
-          console.log("Cooling down before next query...");
-          await humanDelay(10000, 20000);
+          console.log("Query cooldown...");
+          await humanDelay(12000, 20000);
         }
       }
     }
-    console.log("\n[FINISH] Extraction cycle complete.");
+    console.log("\n[COMPLETE] All tasks processed.");
   } catch (err) {
-    console.error("[FATAL ERROR]", err);
+    console.error("[FATAL]", err);
   } finally {
     process.exit(0);
   }
 }
 
-// --- INPUT DATA ---
+// --- RUN ---
 const searchMovie = [
   { phrase: "Harry Potter", timeframes: ["Past 24 hours"], geos: ["PL"] },
   { phrase: "Lord of the Rings", timeframes: ["Past month"], geos: ["US"] }

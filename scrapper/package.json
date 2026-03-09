@@ -1,6 +1,7 @@
 {
   "name": "google-trends-scraper",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "start": "node ./app.js"
   },

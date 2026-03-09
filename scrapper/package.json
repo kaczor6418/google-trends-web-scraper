@@ -1,0 +1,11 @@
+{
+  "name": "google-trends-scraper",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node ./app.js"
+  },
+  "dependencies": {
+    "csvtojson": "2.0.14",
+    "playwright": "1.58.2"
+  }
+}

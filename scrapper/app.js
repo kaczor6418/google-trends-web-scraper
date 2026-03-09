@@ -22,53 +22,64 @@ const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://localhost:3001/ap
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
-// --- HELPERS ---
+// --- TIMEFRAME ALGORITHM ---
 
-const humanDelay = (min = process.env.MIN_DELAY || 2000, max = process.env.MAX_DELAY || 5000) =>
-  new Promise(res => setTimeout(res, Math.floor(Math.random() * (Number(max) - Number(min) + 1) + Number(min))));
+/**
+ * Logic-driven timeframe generator
+ * Handles: 
+ * 1. Constants: "LAST_HOUR", "LAST_4_HOURS", "LAST_24_HOURS"
+ * 2. Date Ranges: { start: "DD-MM-YYYY", end: "DD-MM-YYYY" }
+ */
+function resolveTimeframe(input) {
+  // Handle Constants (String types)
+  if (typeof input === 'string') {
+    switch (input) {
+      case "LAST_HOUR": return { label: "Last Hour", param: "now 1-H" };
+      case "LAST_4_HOURS": return { label: "Last 4 Hours", param: "now 4-H" };
+      case "LAST_24_HOURS": return { label: "Last 24 Hours", param: "now 1-d" };
+      default: return { label: input, param: input };
+    }
+  }
 
-function generateFallbackFilename(result) {
-  const timestamp = new Date().toISOString()
-    .replace(/[:.]/g, '-')
-    .replace('T', '_')
-    .split('Z')[0];
-  
-  const sanitizedPhrase = result.phrase.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const sanitizedTF = result.timeframe.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  
-  return `fallback-[${sanitizedPhrase}-${result.geo}-${sanitizedTF}][${timestamp}].json`;
+  // Handle Date Ranges (Interface types)
+  if (input?.start && input?.end) {
+    // Google Trends expects YYYY-MM-DD format
+    const format = (dateStr) => {
+      const [d, m, y] = dateStr.split('-');
+      return `${y}-${m}-${d}`;
+    };
+    
+    const startFormatted = format(input.start);
+    const endFormatted = format(input.end);
+    
+    // URL pattern: YYYY-MM-DD%20YYYY-MM-DD
+    return {
+      label: `${input.start} to ${input.end}`,
+      param: `${startFormatted} ${endFormatted}`
+    };
+  }
+
+  // Default fallback
+  return { label: "Past Year", param: "today 12-m" };
 }
 
-const TIMEFRAME_MAP = new Map([
-  ["past 24 hours", "now 1-d"],
-  ["past day", "now 1-d"],
-  ["past week", "now 7-d"],
-  ["past 7 days", "now 7-d"],
-  ["past month", "today 1-m"],
-  ["past 30 days", "today 1-m"],
-  ["past 3 months", "today 3-m"],
-  ["past 90 days", "today 3-m"],
-  ["past year", "today 12-m"],
-  ["past 12 months", "today 12-m"],
-]);
-
-const TIMEFRAME_REVERSE_MAP = new Map(
-  Array.from(TIMEFRAME_MAP.entries()).map(([label, param]) => [param, label])
-);
-
+// --- WIDGET NAME NORMALIZATION ---
 const WIDGET_NAME_BY_INDEX = {
   0: "Interest over time",
   1: "Top queries",
   2: "Rising queries",
 };
 
-function normalizeTimeframe(timeframeInput) {
-  if (timeframeInput == null) return { label: "past year", param: "today 12-m" };
-  const raw = String(timeframeInput).trim();
-  const key = raw.toLowerCase();
-  if (TIMEFRAME_MAP.has(key)) return { label: raw, param: TIMEFRAME_MAP.get(key) };
-  const knownLabel = TIMEFRAME_REVERSE_MAP.get(raw);
-  return { label: knownLabel ? knownLabel : raw, param: raw };
+// --- HELPERS ---
+
+const humanDelay = (min = process.env.MIN_DELAY || 2000, max = process.env.MAX_DELAY || 5000) =>
+  new Promise(res => setTimeout(res, Math.floor(Math.random() * (Number(max) - Number(min) + 1) + Number(min))));
+
+function generateFallbackFilename(result) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').split('Z')[0];
+  const sanitizedPhrase = result.phrase.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  const sanitizedTF = result.timeframe.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  return `fallback-[${sanitizedPhrase}-${result.geo}-${sanitizedTF}][${timestamp}].json`;
 }
 
 async function humanLikeScroll(page, selector = ".Jh24Ne") {
@@ -105,13 +116,9 @@ async function humanClick(page, locator) {
   }
 }
 
-/**
- * Persists data to the fallback directory
- */
 function saveToFallbackFile(result) {
   const filename = generateFallbackFilename(result);
   const filePath = path.join(FALLBACK_DIR, filename);
-  
   try {
     fs.writeFileSync(filePath, JSON.stringify(result, null, 2));
     console.log(`[FALLBACK STORED] ${filename}`);
@@ -120,9 +127,6 @@ function saveToFallbackFile(result) {
   }
 }
 
-/**
- * Template for server communication
- */
 async function sendResultToServer(newResult) {
   try {
     const response = await fetch(BACKEND_API_URL, {
@@ -130,11 +134,10 @@ async function sendResultToServer(newResult) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newResult)
     });
-
     if (!response.ok) throw new Error(`Status ${response.status}`);
     console.log(`[SERVER OK] Data synced for: ${newResult.phrase}`);
   } catch (err) {
-    console.error(`[SERVER FAIL] ${err.message}. Redirecting to fallbacks.`);
+    console.error(`[SERVER FAIL] ${err.message}. Saving to fallbacks.`);
     saveToFallbackFile(newResult);
   }
 }
@@ -143,10 +146,10 @@ async function sendResultToServer(newResult) {
  * Main Scraping Logic
  */
 async function scrapeTrendsWidget(page, entry, timeframeInput, geo) {
-  const tf = normalizeTimeframe(timeframeInput);
+  const tf = resolveTimeframe(timeframeInput);
   const url = `https://trends.google.com/explore?q=${encodeURIComponent(entry.phrase)}&date=${encodeURIComponent(tf.param)}&geo=${geo}`;
 
-  console.log(`\n--- Processing: ${entry.phrase} [${geo}] ---`);
+  console.log(`\n--- Processing: ${entry.phrase} [${geo}] | TF: ${tf.label} ---`);
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await humanDelay(5000, 8000);
 
@@ -224,10 +227,21 @@ async function startScraping(searchMovie) {
   }
 }
 
-// --- RUN ---
+// --- UPDATED INPUT STRUCTURE ---
 const searchMovie = [
-  { phrase: "Harry Potter", timeframes: ["Past 24 hours"], geos: ["PL"] },
-  { phrase: "Lord of the Rings", timeframes: ["Past month"], geos: ["US"] }
+  { 
+    phrase: "Harry Potter", 
+    timeframes: [
+      "LAST_24_HOURS", 
+      { start: "11-02-2026", end: "18-02-2026" }
+    ], 
+    geos: ["PL"] 
+  },
+  { 
+    phrase: "Lord of the Rings", 
+    timeframes: [{ start: "01-01-2026", end: "01-03-2026" }], 
+    geos: ["US"] 
+  }
 ];
 
 startScraping(searchMovie);

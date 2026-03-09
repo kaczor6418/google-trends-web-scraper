@@ -1,0 +1,17 @@
+[
+  {
+    "phrase": "Harry Potter",
+    "timeframes": ["LAST_24_HOURS", { "start": "11-02-2026", "end": "18-02-2026" }],
+    "geos": ["PL"]
+  },
+  {
+    "phrase": "Lord of the Rings",
+    "timeframes": ["LAST_24_HOURS"],
+    "geos": ["US", "GB"]
+  },
+  {
+    "phrase": "Game of Thrones",
+    "timeframes": [{ "start": "01-01-2026", "end": "01-03-2026" }],
+    "geos": ["PL", "DE"]
+  }
+]

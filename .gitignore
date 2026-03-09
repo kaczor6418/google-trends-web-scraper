@@ -15,3 +15,5 @@ dist
 
 # logs
 ./scrapper/scraped_trends_data.json
+temp_downloads/
+fallback-*.json

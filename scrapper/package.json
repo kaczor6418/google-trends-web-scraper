@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node ./app.js"
+    "start": "node ./src/extract-data-from-search.js"
   },
   "dependencies": {
     "csvtojson": "2.0.14",

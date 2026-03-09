@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node ./src/extract-data-from-search.js"
+    "scarp-data": "node ./src/extract-data-from-search.js",
+    "sync-fallbacks": "node ./src/retry-fallback-save.js"
   },
   "dependencies": {
     "csvtojson": "2.0.14",

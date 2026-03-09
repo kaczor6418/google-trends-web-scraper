@@ -13,7 +13,11 @@
 node_modules
 dist
 
+# env 
+.env
+
 # logs
 ./scrapper/scraped_trends_data.json
 temp_downloads/
+fallbacks/
 fallback-*.json

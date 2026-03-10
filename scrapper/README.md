@@ -79,9 +79,9 @@ google-chrome-stable --remote-debugging-port=9222 --user-data-dir="$HOME/.config
 
 ### 2. Available NPM Scripts
 
-* `npm start`: Runs the scraper using the default `search_queries.json`.
-* `npm start <path-to-file.json>`: Runs the scraper with a specific query file.
-* `npm run sync`: Manually triggers the retry process to push `fallbacks/` files to your server.
+* `npm scrap-data`: Runs the scraper using the default `search_queries.json`.
+* `npm scrap-data <path-to-file.json>`: Runs the scraper with a specific query file.
+* `npm run sync-fallbacks`: Manually triggers the retry process to push `fallbacks/` files to your server.
 
 ---
 
@@ -89,9 +89,11 @@ google-chrome-stable --remote-debugging-port=9222 --user-data-dir="$HOME/.config
 
 | File | Responsibility |
 | --- | --- |
+| `./src/constants.js` | File with constant mapings used across project. |
 | `./src/extract-data-from-search.js` | Entry point; parses command-line arguments and loads configurations. |
 | `./src/retry-fallback-save.js` | Utility script to re-process files stored in the `fallbacks/` folder. |
 | `./src/scraper/trendsScraper.js` | Orchestrates navigation, element detection, and the download-parse-sync loop. |
 | `./src/utils/timeframes.js` | Algorithm to convert human-friendly timeframes into Google query parameters. |
 | `./src/utils/humanBehavior.js` | Utilities for mouse movement, smooth scrolling, and randomized delays. |
 | `./src/utils/persistence.js` | Handles API communication and writes failed requests to disk. |
+| `./src/utils/normalizeScrapedData.js` | Normalize scraped data for better readbility. |

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "scarp-data": "node ./src/extract-data-from-search.js",
+    "scrap-data": "node ./src/extract-data-from-search.js",
     "sync-fallbacks": "node ./src/retry-fallback-save.js"
   },
   "dependencies": {

@@ -11,6 +11,7 @@
 
 # Other
 node_modules
+generated
 dist
 
 # env 

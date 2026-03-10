@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enums - Fixed syntax (one value per line or space-separated)
+enum DictionaryType {
+  ofertowy
+  popularnonaukowy
+}
+
+enum LongtailSource {
+  openai
+  trends
+  manual
+  import
+}
+
+enum TrendQueryGroup {
+  top
+  rising
+  unknown
+}
+
+model DictionaryWord {
+  id               BigInt         @id @default(autoincrement())
+  type             DictionaryType
+  word             String
+  created_at       DateTime       @default(now()) @db.Timestamptz
+  updated_at       DateTime       @default(now()) @db.Timestamptz
+  longtailPhrases  LongtailPhrase[]
+  articles         Article[]
+
+  @@unique([type, word], map: "uq_dictionary_words_type_word_lower")
+  @@map("dictionary_words")
+}
+
+model LongtailPhrase {
+  id                 BigInt         @id @default(autoincrement())
+  dictionary_word_id BigInt
+  phrase             String
+  phrase_norm        String
+  geo                String         @default("PL")
+  language           String         @default("pl")
+  source             LongtailSource @default(manual)
+  active             Boolean        @default(true)
+  created_at         DateTime       @default(now()) @db.Timestamptz
+  
+  dictionaryWord     DictionaryWord @relation(fields: [dictionary_word_id], references: [id], onDelete: Cascade)
+  trends             PhraseTrend[]
+  alerts             TrendAlert[]
+  articles           Article[]
+
+  @@unique([dictionary_word_id, phrase_norm], map: "uq_longtail_dictionary_phrase_norm")
+  @@map("longtail_phrases")
+}
+
+model PhraseTrend {
+  id                 BigInt              @id @default(autoincrement())
+  longtail_phrase_id BigInt
+  snapshot_date      DateTime            @default(dbgenerated("CURRENT_DATE")) @db.Date
+  geo                String              @default("PL")
+  timeframe_label    String
+  timeframe_param    String
+  window_days        Int                 @default(30)
+  extracted_at       DateTime            @db.Timestamptz
+  points             Int                 @default(0)
+  mean               Float?
+  slope              Float?
+  change_pct         Float?
+  score              Float?
+  raw_series         Json?
+  created_at         DateTime            @default(now()) @db.Timestamptz
+  
+  longtailPhrase     LongtailPhrase      @relation(fields: [longtail_phrase_id], references: [id], onDelete: Cascade)
+  relatedQueries     TrendRelatedQuery[]
+  alerts             TrendAlert[]
+
+  @@unique([longtail_phrase_id, snapshot_date, geo, timeframe_param], map: "uq_phrase_trends_phrase_day_cfg")
+  @@map("phrase_trends")
+}
+
+model TrendRelatedQuery {
+  id              BigInt          @id @default(autoincrement())
+  phrase_trend_id BigInt
+  group_type      TrendQueryGroup @default(unknown)
+  rank            Int
+  query           String
+  search_interest Int?
+  increase_pct    Float?
+  is_breakout     Boolean         @default(false)
+  created_at      DateTime        @default(now()) @db.Timestamptz
+  
+  phraseTrend     PhraseTrend     @relation(fields: [phrase_trend_id], references: [id], onDelete: Cascade)
+
+  @@unique([phrase_trend_id, group_type, query])
+  @@map("trend_related_queries")
+}
+
+model Article {
+  id                 BigInt         @id @default(autoincrement())
+  longtail_phrase_id BigInt?
+  dictionary_word_id BigInt?
+  title              String
+  title_norm         String         @unique(map: "uq_articles_title_norm")
+  status             String         @default("draft")
+  content            String?
+  created_at         DateTime       @default(now()) @db.Timestamptz
+  published_at       DateTime?      @db.Timestamptz
+  
+  longtailPhrase     LongtailPhrase? @relation(fields: [longtail_phrase_id], references: [id])
+  dictionaryWord     DictionaryWord? @relation(fields: [dictionary_word_id], references: [id])
+
+  @@map("articles")
+}
+
+model TrendAlert {
+  id                 BigInt         @id @default(autoincrement())
+  longtail_phrase_id BigInt
+  phrase_trend_id    BigInt?
+  threshold          Float          @default(20)
+  change_pct         Float
+  status             String         @default("open")
+  created_at         DateTime       @default(now()) @db.Timestamptz
+  alert_day          DateTime       @default(dbgenerated("CURRENT_DATE")) @db.Date
+  
+  longtailPhrase     LongtailPhrase @relation(fields: [longtail_phrase_id], references: [id], onDelete: Cascade)
+  phraseTrend        PhraseTrend?   @relation(fields: [phrase_trend_id], references: [id])
+
+  @@unique([longtail_phrase_id, alert_day], map: "uq_trend_alerts_phrase_day")
+  @@map("trend_alerts")
+}

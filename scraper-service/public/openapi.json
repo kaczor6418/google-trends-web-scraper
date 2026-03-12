@@ -1,0 +1,114 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Google Trends Scrapper API",
+    "description": "API for managing longtail phrases, trend ingestion, and alerts.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/api/v1/trends/ingest/interest": {
+      "post": {
+        "summary": "Ingest interest over time",
+        "description": "Ingests historical interest data for a specific phrase and timeframe.",
+        "responses": {
+          "201": { "description": "Interest data ingested successfully" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/v1/trends/ingest/top": {
+      "post": {
+        "summary": "Ingest top queries",
+        "description": "Ingests top-performing search queries related to a base phrase.",
+        "responses": {
+          "201": { "description": "Top queries ingested successfully" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/v1/trends/ingest/rising": {
+      "post": {
+        "summary": "Ingest rising queries",
+        "description": "Ingests search queries that are rapidly increasing in popularity.",
+        "responses": {
+          "201": { "description": "Rising queries ingested successfully" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/api/v1/trends/trending": {
+      "get": {
+        "summary": "Get trending phrases",
+        "description": "Returns a list of trending phrases ordered by slope.",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer" }, "description": "Number of results" }
+        ],
+        "responses": {
+          "200": { "description": "List of trending phrases" }
+        }
+      }
+    },
+    "/api/v1/trends/alerts": {
+      "get": {
+        "summary": "Get active alerts",
+        "description": "Returns all currently open trend alerts.",
+        "responses": {
+          "200": { "description": "List of active alerts" }
+        }
+      }
+    },
+    "/api/v1/trends/phrases/{id}/history": {
+      "get": {
+        "summary": "Get phrase history",
+        "description": "Retrieves the full historical trend data and related articles for a specific phrase ID.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Phrase history and details" },
+          "404": { "description": "Phrase not found" }
+        }
+      }
+    },
+    "/api/v1/trends/phrases/{id}/threshold": {
+      "patch": {
+        "summary": "Update phrase threshold",
+        "description": "Updates the alert threshold percentage for a specific longtail phrase.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Threshold updated" }
+        }
+      }
+    },
+    "/api/v1/dictionary/{type}": {
+      "get": {
+        "summary": "List dictionary words",
+        "description": "Lists all words within a specific dictionary type (e.g., ofertowy, popularnonaukowy).",
+        "parameters": [
+          { "name": "type", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of words" }
+        }
+      },
+      "post": {
+        "summary": "Add dictionary word",
+        "description": "Adds a new word to the specified dictionary type.",
+        "parameters": [
+          { "name": "type", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "201": { "description": "Word created" }
+        }
+      }
+    }
+  }
+}

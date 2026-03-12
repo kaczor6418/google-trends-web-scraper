@@ -16,7 +16,7 @@ dist
 buildcache
 
 # env 
-.env
+
 
 # logs
 ./scrapper/scraped_trends_data.json

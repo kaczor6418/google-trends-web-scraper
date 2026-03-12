@@ -73,7 +73,7 @@ Before the application can be used, the database schema needs to be initialized 
 
 1. Start the database container (so Prisma has something to connect to):
 ```bash
-docker-compose up -d db
+docker-compose up --build -d
 ```
 
 2. Run the migration command to construct the tables based on `schema.prisma`:

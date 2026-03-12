@@ -65,14 +65,12 @@ You must launch Chrome with the remote debugging port enabled **before** running
 * **Linux (Arch/Ubuntu):**
 ```bash
 google-chrome-stable --remote-debugging-port=9222 --user-data-dir="$HOME/.config/chrome-automation"
-
 ```
 
 
 * **Windows:**
 ```cmd
 "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-automation"
-
 ```
 
 

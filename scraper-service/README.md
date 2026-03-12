@@ -85,24 +85,11 @@ docker-compose exec app npx prisma migrate dev --name init
 
 ---
 
-## 6. How to Run (Docker vs. Local)
+## 6. How to Run Localy
 
-### Option A: Running via Docker (Recommended)
+>If you use docker from previous section you can skip this section
 
-This is the easiest way to run the full stack, as it spins up the API, Database, and pgAdmin simultaneously.
-
-```bash
-# Build the images and start all services in detached mode
-docker-compose up --build -d
-```
-
-To view the logs of your running API:
-
-```bash
-docker-compose logs -f app
-```
-
-### Option B: Running Locally (Development Mode)
+### Running Locally (Development Mode)
 
 If you prefer to run the Node.js app directly on your host machine for faster debugging:
 

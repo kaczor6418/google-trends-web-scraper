@@ -13,6 +13,7 @@
 node_modules
 generated
 dist
+buildcache
 
 # env 
 .env

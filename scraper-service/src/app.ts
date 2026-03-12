@@ -1,31 +1,18 @@
 import express from 'express';
-import cors from 'cors';
-import trendRoutes from './routes/trends.routes';
-import phraseRoutes from './routes/phrases.routes';
+import trendsRoutes from './routes/trends.routes';
 
-(BigInt.prototype as any).toJSON = function () {
-  return this.toString();
-};
+// BIGINT FIX: Prisma returns BigInt for some fields, which JSON.stringify cannot handle.
+(BigInt.prototype as any).toJSON = function () { return this.toString(); };
 
 const app = express();
-app.use(cors());
 app.use(express.json());
 
-app.use('/api/v1/trends', trendRoutes);
-app.use('/api/v1/phrases', phraseRoutes);
+// Routes
+app.use('/api/v1/trends', trendsRoutes);
 
-app.listen(3000, () => console.log('API Server running on port 3000'));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Trend Scraper Service running on port ${PORT}`);
+});
 
-import { prisma } from '../src/lib/prisma';
-
-async function test() {
-  try {
-    await prisma.$connect();
-    console.log("Database connection successful!");
-  } catch (e) {
-    console.error("Connection failed:", e);
-  } finally {
-    await prisma.$disconnect();
-  }
-}
-test();
+export default app;

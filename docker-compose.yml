@@ -1,21 +1,51 @@
 services:
   db:
     image: postgres:18
-    restart: always
+    container_name: trends_db_container
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: trends_db
     ports:
       - "5432:5432"
+    networks:
+      - trends_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d trends_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trends_app_container
+    ports:
+      - "3000:3000"
+    environment:
+      # Connect using the SERVICE NAME 'db'
+      DATABASE_URL: "postgresql://user:password@db:5432/trends_db?schema=public"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - trends_network
+    volumes:
+      - ./scraper-service:/app/scraper-service
+      - /app/scraper-service/node_modules
 
   pgadmin:
     image: dpage/pgadmin4
-    restart: always
+    container_name: trends_pgadmin_container
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: password
+      PGADMIN_DEFAULT_PASSWORD: root
     ports:
       - "8080:80"
-    depends_on:
-      - db
+    networks:
+      - trends_network
+
+networks:
+  trends_network:
+    driver: bridge

@@ -77,8 +77,8 @@ google-chrome-stable --remote-debugging-port=9222 --user-data-dir="$HOME/.config
 
 ### 2. Available NPM Scripts
 
-* `npm scrap-data`: Runs the scraper using the default `search_queries.json`.
-* `npm scrap-data <path-to-file.json>`: Runs the scraper with a specific query file.
+* `npm run scrap-data`: Runs the scraper using the default `search_queries.json`.
+* `npm run scrap-data <path-to-file.json>`: Runs the scraper with a specific query file.
 * `npm run sync-fallbacks`: Manually triggers the retry process to push `fallbacks/` files to your server.
 
 ---
